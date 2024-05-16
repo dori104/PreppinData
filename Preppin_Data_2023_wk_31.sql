@@ -1,0 +1,88 @@
+CREATE OR REPLACE TABLE DP_PD_2023_WK31_LOOKUP AS 
+
+WITH LOOKUP1 AS (
+-- Distinct non-null list of emp IDs and corresponding GUIDs
+    SELECT
+        EMPLOYEE_ID
+        ,GUID
+    FROM TIL_PLAYGROUND.PREPPIN_DATA_INPUTS.PD2023_WK31_EMPLOYEE
+    GROUP BY EMPLOYEE_ID, GUID
+),
+
+LOOKUP2 AS (
+-- Distinct non-null list of emp IDs and corresponding GUIDs 
+    SELECT
+        EMPLOYEE_ID
+        ,GUID
+    FROM TIL_PLAYGROUND.PREPPIN_DATA_INPUTS.PD2023_WK31_MONTHLY
+    GROUP BY EMPLOYEE_ID, GUID
+)
+
+/* Assuming that if an ID is missing from one table it will be present in the other,
+  putting both distinct lists together should get a list of all corresponding IDs
+*/
+SELECT DISTINCT * FROM (
+    SELECT * FROM LOOKUP1
+    UNION
+    SELECT * FROM LOOKUP2
+)
+WHERE EMPLOYEE_ID IS NOT NULL AND GUID IS NOT NULL
+;
+
+
+CREATE OR REPLACE TABLE DP_PD_2023_WK31_EMPLOYEE AS
+
+SELECT
+    -- If emp ID blank, get emp ID from lookup
+    NVL(E.EMPLOYEE_ID, L2.EMPLOYEE_ID) AS EMPLOYEE_ID
+
+    -- If GUID blank, get GUID from lookup
+    ,NVL(E.GUID, L1.GUID) AS GUID
+
+    ,FIRST_NAME
+    ,LAST_NAME
+    ,TO_DATE(DATE_OF_BIRTH,'DD/MM/YYYY') AS DATE_OF_BIRTH
+    ,NATIONALITY
+    ,GENDER
+    ,EMAIL
+    ,TO_DATE(HIRE_DATE,'DD/MM/YYYY') AS HIRE_DATE
+    ,TO_DATE(LEAVE_DATE,'DD/MM/YYYY') AS LEAVE_DATE
+
+FROM TIL_PLAYGROUND.PREPPIN_DATA_INPUTS.PD2023_WK31_EMPLOYEE AS E
+
+-- Join to lookup twice - first join on employee ID (used to fill in null GUID)
+LEFT JOIN DP_PD_2023_WK31_LOOKUP AS L1
+ON E.EMPLOYEE_ID = L1.EMPLOYEE_ID
+
+-- Second join on GUID (used to fill in null employee ID)
+LEFT JOIN DP_PD_2023_WK31_LOOKUP AS L2
+ON E.GUID = L2.GUID
+;
+
+
+CREATE OR REPLACE TABLE DP_PD_2023_WK31_MONTHLY AS
+
+SELECT
+    -- If emp ID blank, get emp ID from lookup
+    NVL(M.EMPLOYEE_ID, L2.EMPLOYEE_ID) AS EMPLOYEE_ID
+
+    -- If GUID blank, get GUID from lookup
+    ,NVL(M.GUID, L1.GUID) AS GUID
+
+    ,DC_NBR
+    ,TO_DATE(MONTH_END_DATE,'DD/MM/YYYY') AS MONTH_END_DATE
+    ,TO_DATE(HIRE_DATE,'DD/MM/YYYY') AS HIRE_DATE
+    ,TO_DATE(LEAVE_DATE,'DD/MM/YYYY') AS LEAVE_DATE
+
+FROM TIL_PLAYGROUND.PREPPIN_DATA_INPUTS.PD2023_WK31_MONTHLY AS M
+
+-- Join to lookup twice - first join on employee ID (used to fill in null GUID)
+LEFT JOIN DP_PD_2023_WK31_LOOKUP AS L1
+ON M.EMPLOYEE_ID = L1.EMPLOYEE_ID
+
+-- Second join on GUID (used to fill in null employee ID)
+LEFT JOIN DP_PD_2023_WK31_LOOKUP AS L2
+ON M.GUID = L2.GUID
+;
+
+
